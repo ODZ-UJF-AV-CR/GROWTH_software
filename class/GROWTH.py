@@ -20,8 +20,6 @@ import random
 # GROWTH class
 class GROWTH:
     def __init__(self, GR):
-        ''' Constructor '''
-        
         # GR1 = Musala, GR2 = Jungfraujoch, GR3 = Zugspitze
         # Musala has two active channels 0 and 2, Jungfraujoch has one active channel 0, and Zugspitze has one active channel 0
         channel_dict = {'GR1':[0], 'GR2':[0], 'GR3':[0]} # Dictionary with active channels
@@ -37,13 +35,11 @@ class GROWTH:
         print('Object has been terminated. "I\'ll be back."')
         
     def go_through_files(self, time, path=None):
-        '''
-        This function goes through files in the path and return only the files of interest
-        It has two arguments - time and path. Time must be given as as the tuple of two strings. 
-        
-        '''
-        if (path != None):
-            self.path = path
+        # This function goes through files in the path and return only the files of interest
+        # It has two arguments - time and path. Time must be given as as the tuple of two strings. 
+
+        if (path == None):
+            path = self.path
   
         if isinstance(time, tuple):
             (t1, t2) = time
@@ -54,7 +50,7 @@ class GROWTH:
             Ym1 = str(dt1.year) + f"{dt1:%m}"
             Ym2 = str(dt2.year) + f"{dt1:%m}"
             if Ym1 == Ym2:
-                directory = os.path.join(self.path, Ym1)
+                directory = os.path.join(path, Ym1)
                 temp = os.path.join(directory, Ym1 + '*.fits.gz')
                 files = glob.glob(temp)
                 tup = list(map(file2datetime, files))
@@ -66,6 +62,14 @@ class GROWTH:
             else:
                 files = []
 
+        elif isinstance(time, str):
+            dt = str2datetime(time)
+            Ym = str(dt.year) + f"{dt:%m}"
+            self.time_range = Ym
+            directory = os.path.join(path, Ym)
+            temp = os.path.join(directory, Ym + '*.fits.gz')
+            files = glob.glob(temp)
+
         else:
             print('Wrong argument of go_through_files() function')
             files = []
@@ -73,9 +77,70 @@ class GROWTH:
         files = list(np.unique(files))
         self.files = files  
         print(str(len(files)) + ' .fits.gz files were found.')
-        #print(files)
-        return files
-           
+        return files        
+
+    '''
+    def read_fits(self, files=None, channels=None):
+        # Reads .fits file data
+        
+        if (files == None):
+            files = self.files
+        if (channels == None):
+            channels = self.channels
+
+        df = pd.DataFrame()
+        lst = []
+        for file in files:
+            temp = []
+            if (os.path.exists(file) == False):
+                print("Error: File " + file + ' could not be found.')
+                exit()
+            fits_file = fitsio.open(file)
+            if len(fits_file) < 3:
+                print("Warning: This FITS file is not properly finalized. Pipeline stopped.")
+                gps_status = False
+                exit()
+            else:
+                data = fits_file[1].data
+                gps = fits_file[2].data
+                gps_status = gps_status_test(gps)
+                if (gps_status == True):
+                    time_standard = gps_base_time(gps)
+                else:
+                    time_standard = non_gps_base_time(file)
+
+                for channel in channels:
+                    df = extract_data(channel, data, time_standard)
+                    temp.append(df)
+            for channel in channels:
+                if lst == []:
+                    lst = temp
+                else:
+                    lst[channel] = lst[channel].append(temp[channel], ignore_index=True)
+        data_zip = zip(self.channels, lst)
+        data_dict = dict(data_zip)
+        self.data = data_dict
+        print('Data were loaded into DataFrame.')
+        return data_dict
+    
+    
+    def export(self, output_file=None, channels=None):
+        if (output_file == None):
+            tm = str(self.time_range[1])
+            _, tm = tm.split()
+            #print(tm)
+            self.output_file = str(self.time_range[0]) + '_' + tm
+        if (channels == None):
+            out_channel = self.channels
+            
+        for channel in out_channel:
+            df = self.data[channel]
+            filename = self.output_file + '_' + str(channel) + '.csv'
+            df.to_csv(filename)
+            #print(df.shape)
+
+    '''
+
     def per_event_data(self):
         out = []
         for channel in self.channels:
@@ -94,97 +159,6 @@ class GROWTH:
         #a = df['TimeTag']
         #print(a[1])
         return self.data
-        
-    '''
-    def read_fits(self, filelist=None, channels=None):
-        # Reads .fits file data
-        
-        if (filelist != None):
-            self.files = filelist
-        if (channels != None):
-            self.channels = channels
-
-        df = pd.DataFrame()
-        lst = []
-        for file in self.files:
-            print(file)
-            temp = []
-            if (os.path.exists(file) == False):
-                print("Error: File " + file + ' could not be found.')
-                exit()
-            fits_file = fitsio.open(file)
-            if len(fits_file) < 3:
-                print("Warning: This FITS file is not properly finalized. Pipeline stopped.")
-                gps_status = False
-                exit()
-            else:
-                data = fits_file[1].data
-                gps = fits_file[2].data
-                #print(gps)
-                gps_status = gps_status_test(gps)
-                #print(gps_status)
-                if (gps_status == True):
-                    time_standard = gps_base_time(gps)
-                else:
-                    time_standard = non_gps_base_time(file)
-                    #continue
-
-                for channel in self.channels:
-                    #print(time_standard)
-                    df = extract_data(channel, data, time_standard)
-                    temp.append(df)
-            for channel in self.channels:
-                if lst == []:
-                    lst = temp
-                else:
-                    lst[channel] = lst[channel].append(temp[channel], ignore_index=True)
-        data_zip = zip(self.channels, lst)
-        data_dict = dict(data_zip)
-        self.data = data_dict
-        print('Data were loaded into DataFrame.')
-        #print(data_dict)
-        return data_dict
-    
-    
-    def export(self, output_file=None, channels=None):
-        if (output_file == None):
-            tm = str(self.time_range[1])
-            _, tm = tm.split()
-            #print(tm)
-            self.output_file = str(self.time_range[0]) + '_' + tm
-        if (channels == None):
-            out_channel = self.channels
-            
-        for channel in out_channel:
-            df = self.data[channel]
-            filename = self.output_file + '_' + str(channel) + '.csv'
-            df.to_csv(filename)
-            #print(df.shape)
-    
-    def read_RT_csv(self, file):
-        df = pd.read_csv(file)
-        df = df[df['amplitude']>=400]
-        #print(df)
-        timestamp = list(df['timestamp'].to_numpy())
-        timestamp = list(map(str, timestamp))
-        microseconds = list(df['microseconds'].to_numpy())
-        microseconds = list(map(str, microseconds))
-        time = list(map(''.join, zip(timestamp, microseconds)))
-        df = df.drop(columns=['microseconds', 'timestamp'])
-        df.index = pd.to_datetime(time, unit='us')
-        df.columns = ['ll', 'Height']
-        df = df.drop(columns=['ll'])
-        
-        mask = df.index.to_series().between('2020-01-01', '2022-01-10')
-        df = df[mask]
-        #print(df)
-        ten_min = df.groupby(pd.Grouper(freq='10min')).agg(['count', 'sum'])
-        ten_min = {0:ten_min}
-        one_sec = df.groupby(pd.Grouper(freq='1s')).agg(['count', 'sum'])
-        one_sec = {0:one_sec}
-        #print(ten_min)
-        return one_sec, ten_min
-    '''
         
     def time_series(self, frequency, components=None):
         self.time_series_data = 0
@@ -903,8 +877,8 @@ def data_process(gps_ok, gps_not_ok, channel):
     # df_data = sort
     return df_data, end_list
 
-def gps_process(filelist):
-    gps_ok, gps_not_ok, gps_missing = read_gps_from_fits(filelist)
+def gps_process(files):
+    gps_ok, gps_not_ok, gps_missing = read_gps_from_fits(files)
     #print('before gps process', len(gps_ok), len(gps_not_ok))
     gps_ok, not_validated_gps = process_ok_gps(gps_ok) # gps_ok is a list of tuples ([files], [ticks], [time], [p])
     #print(not_validated_gps)
@@ -927,10 +901,10 @@ def gps_process(filelist):
     #print(gps_not_ok)
     return gps_ok, gps_not_ok
 
-def read_gps_from_fits(filelist):
+def read_gps_from_fits(files):
     # Reads GPS data from .fits files
     gps_ok, gps_not_ok, gps_missing  = [], [], []
-    for file in filelist:
+    for file in files:
         fits_file = fitsio.open(file)
         
         try:
