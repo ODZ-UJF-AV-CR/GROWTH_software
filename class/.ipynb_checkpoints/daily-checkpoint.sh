@@ -1,0 +1,3 @@
+python3 /home/sommema4/git/GROWTH_software/class/growth_daily_test.py --growth GR3 --output /scratch/sommema4/GROWTH_daily/GR3_Zugspitze
+#python3 /home/sommema4/git/GROWTH_software/class/growth_daily_test.py --growth GR2 --output /scratch/sommema4/GROWTH_daily/GR2_Jungfraujoch
+#python3 /home/sommema4/git/GROWTH_software/class/growth_daily_test.py --growth GR1 --output /scratch/sommema4/GROWTH_daily/GR1_Musala 2>/dev/null
